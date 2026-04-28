@@ -1,0 +1,288 @@
+package com.joelmir.chatwifi;
+
+import android.app.Activity;
+import android.content.*;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.*;
+
+public class MainActivity extends Activity {
+
+    EditText editMensagem;
+    LinearLayout chatContainer;
+    ScrollView scrollChat;
+    Button btnEnviar;
+    Button btnConfig;
+    TextView txtStatus;
+
+    private boolean chatAttached = false;
+    private String lastStatus = "";
+    private boolean receiverRegistered = false;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
+
+        editMensagem = (EditText) findViewById(R.id.editMensagem);
+        chatContainer = (LinearLayout) findViewById(R.id.chatContainer);
+        scrollChat = (ScrollView) findViewById(R.id.scrollChat);
+        btnEnviar = (Button) findViewById(R.id.btnEnviar);
+        btnConfig = (Button) findViewById(R.id.btnConfig);
+        txtStatus = (TextView) findViewById(R.id.txtStatus);
+
+        registerReceiverSafe();
+
+        btnConfig.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this, ConfigActivity.class));
+            }
+        });
+
+        btnEnviar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                if (ChatHolder.chat == null || !ChatHolder.chat.isConnected()) {
+                    Toast.makeText(MainActivity.this,
+                            "Não conectado", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                String msg = editMensagem.getText().toString().trim();
+                if (msg.length() == 0) return;
+
+                ChatHolder.chat.sendMessage(msg);
+
+                addMessage("Eu: " + msg, true);
+
+                editMensagem.setText("");
+            }
+        });
+
+        txtStatus.setText("Aguardando serviço...");
+    }
+
+    // =========================
+    private void registerReceiverSafe() {
+
+        if (receiverRegistered) return;
+
+        registerReceiver(receiver,
+                new IntentFilter(ChatHolder.ACTION_STATUS));
+
+        receiverRegistered = true;
+    }
+
+    // =========================
+    private BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+
+            String status = intent.getStringExtra("status");
+            String error = intent.getStringExtra("error");
+
+            Log.d("CHAT_DEBUG", "status=" + status + " error=" + error);
+
+            if (status == null || status.trim().length() == 0) {
+                txtStatus.setText("Status inválido");
+                return;
+            }
+
+            if (status.equals(lastStatus)) return;
+            lastStatus = status;
+
+            // =========================
+            // SERVER RUNNING
+            // =========================
+            if ("server_running".equals(status)) {
+
+            	SharedPreferences prefs =
+            	        getSharedPreferences("chat", MODE_PRIVATE);
+
+            	final String ip = prefs.getString("ip", "");
+            	
+            	if (ip == null || ip.length() == 0) {
+            	    txtStatus.setText("Servidor ativo\nIP: obtendo...");
+            	} else {
+            	    txtStatus.setText("Servidor ativo\nIP: " + ip);
+            	}
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        if (ip == null || ip.length() == 0) {
+                            txtStatus.setText("Servidor ativo\nIP: obtendo...");
+                        } else {
+                            txtStatus.setText("Servidor ativo\nIP: " + ip);
+                        }
+
+                        chatAttached = false;
+                        setupChat();
+                    }
+                });
+
+                return;
+            }
+
+            // =========================
+            // CONNECTED
+            // =========================
+            if ("connected".equals(status)) {
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        txtStatus.setText("Conectado");
+                        chatAttached = false;
+                        setupChat();
+                    }
+                });
+
+                return;
+            }
+
+            // =========================
+            if ("connecting".equals(status)) {
+
+                txtStatus.setText(
+                        "Conectando...\n\n" +
+                        error
+                );
+
+                return;
+            }
+
+            // =========================
+            if ("disconnected".equals(status)) {
+                txtStatus.setText("Conexão perdida");
+                return;
+            }
+
+            // =========================
+            if ("initializing".equals(status)) {
+                txtStatus.setText("Inicializando serviço...");
+                return;
+            }
+
+            // =========================
+            if ("error_connect".equals(status)) {
+                txtStatus.setText("Erro conectar:\n" + error);
+                return;
+            }
+
+            if ("error_server".equals(status)) {
+                txtStatus.setText("Erro servidor:\n" + error);
+                return;
+            }
+
+            if ("error_client".equals(status)) {
+                txtStatus.setText("Erro cliente:\n" + error);
+                return;
+            }
+
+            txtStatus.setText(status);
+        }
+    };
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        SharedPreferences prefs = getSharedPreferences("chat", MODE_PRIVATE);
+
+        String modo = prefs.getString("modo", "client");
+        String ip = prefs.getString("ip", "");
+
+        Intent i = new Intent(this, ChatService.class);
+
+        stopService(i);
+        startService(i);
+
+        if ("server".equals(modo)) {
+            txtStatus.setText("Servidor iniciando...\nIP: " + ip);
+        } else {
+            txtStatus.setText("Conectando a " + ip);
+        }
+    }
+
+    // =========================
+    private void setupChat() {
+
+        if (ChatHolder.chat == null) return;
+
+        if (chatAttached) return;
+
+        chatAttached = true;
+
+        ChatHolder.chat.setMessageListener(
+                new ChatConnection.MessageListener() {
+                    @Override
+                    public void onMessage(final String msg) {
+
+                        Log.d("CHAT_DEBUG", "MSG: " + msg);
+
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                addMessage(msg, false);
+                            }
+                        });
+                    }
+                }
+        );
+    }
+
+    // =========================
+    private void addMessage(String msg, boolean me) {
+
+        TextView tv = new TextView(this);
+        tv.setText(msg);
+        tv.setTextColor(0xFF000000);
+        tv.setTextSize(16);
+
+        LinearLayout.LayoutParams p =
+                new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+
+        p.gravity = me ? Gravity.RIGHT : Gravity.LEFT;
+        p.setMargins(10, 6, 10, 6);
+
+        tv.setLayoutParams(p);
+
+        if (me) {
+            tv.setBackgroundResource(R.drawable.bubble_me);
+        } else {
+            tv.setBackgroundResource(R.drawable.bubble_other);
+        }
+
+        chatContainer.addView(tv);
+
+        scrollChat.post(new Runnable() {
+            @Override
+            public void run() {
+                scrollChat.fullScroll(View.FOCUS_DOWN);
+            }
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        try {
+            if (receiverRegistered) {
+                unregisterReceiver(receiver);
+                receiverRegistered = false;
+            }
+        } catch (Exception ignored) {}
+
+        chatAttached = false;
+    }
+}

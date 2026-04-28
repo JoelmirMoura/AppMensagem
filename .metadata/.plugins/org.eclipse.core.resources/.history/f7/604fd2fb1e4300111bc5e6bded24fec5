@@ -1,0 +1,20 @@
+package com.joelmir.chatwifi;
+
+public class ChatHolder {
+
+    public static ChatConnection chat;
+
+    public static String lastError = "";
+    public static String serverIp = "";
+    public static String status = "idle";
+
+    public static final String ACTION_STATUS =
+            "com.joelmir.chatwifi.STATUS_UPDATE";
+
+    public static void reset() {
+        chat = null;
+        lastError = "";
+        serverIp = "";
+        status = "idle";
+    }
+}

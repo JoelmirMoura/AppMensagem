@@ -1,0 +1,47 @@
+package com.joelmir.chatwifi;
+
+import android.app.Activity;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.*;
+
+public class ConfigActivity extends Activity {
+
+    EditText editNome;
+    Button btnSalvar;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.config);
+
+        editNome = (EditText) findViewById(R.id.editNome);
+        btnSalvar = (Button) findViewById(R.id.btnSalvar);
+
+        final android.content.SharedPreferences prefs =
+                getSharedPreferences("chat", MODE_PRIVATE);
+
+        // carrega nome salvo
+        String nome = prefs.getString("nome", "Eu");
+        editNome.setText(nome);
+
+        btnSalvar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                String nomeDigitado = editNome.getText().toString();
+
+                if (nomeDigitado == null || nomeDigitado.trim().length() == 0) {
+                    Toast.makeText(ConfigActivity.this, "Digite um nome!", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                prefs.edit().putString("nome", nomeDigitado).apply();
+
+                Toast.makeText(ConfigActivity.this, "Nome salvo!", Toast.LENGTH_SHORT).show();
+
+                finish(); // volta pra tela principal
+            }
+        });
+    }
+}

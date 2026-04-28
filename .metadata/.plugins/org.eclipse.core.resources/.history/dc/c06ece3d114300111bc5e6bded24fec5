@@ -1,0 +1,139 @@
+package com.joelmir.chatwifi;
+
+import android.app.Service;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.IBinder;
+import android.util.Log;
+import android.os.PowerManager;
+import android.net.wifi.WifiManager;
+
+public class ChatService extends Service {
+
+	private PowerManager.WakeLock wakeLock;
+	private WifiManager.WifiLock wifiLock;
+	
+    private Thread workerThread;
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+
+        SharedPreferences prefs =
+                getSharedPreferences("chat", MODE_PRIVATE);
+
+        String modo = prefs.getString("modo", "client");
+        String ip = prefs.getString("ip", "");
+
+        ChatHolder.lastError = "";
+
+        if (ChatHolder.chat != null) {
+            ChatHolder.chat.close();
+        }
+
+        ChatHolder.chat = new ChatConnection();
+
+        if ("server".equals(modo)) {
+            startServer();
+        } else {
+            startClient(ip);
+        }
+
+        return START_STICKY;
+    }
+
+    // =========================
+    private void startServer() {
+
+        ChatHolder.chat.setConnectionListener(
+                new ChatConnection.ConnectionListener() {
+                    @Override
+                    public void onClientConnected() {
+
+                        ChatHolder.status = "connected";
+                        sendStatus();
+                    }
+                });
+
+        workerThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+
+                    ChatHolder.chat.startServer(5000);
+
+                    ChatHolder.serverIp =
+                            NetworkUtil.getWifiIp(getApplicationContext());
+
+                    ChatHolder.status = "server_ready";
+                    sendStatus();
+
+                } catch (Exception e) {
+
+                    ChatHolder.lastError =
+                            e.getClass().getSimpleName() + ": " + e.getMessage();
+
+                    ChatHolder.status = "error_server";
+                    sendStatus();
+                }
+            }
+        });
+
+        workerThread.start();
+    }
+
+    // =========================
+    private void startClient(final String ip) {
+
+        workerThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+
+                    if (ip == null || ip.length() == 0) {
+                        ChatHolder.status = "error_client";
+                        sendStatus();
+                        return;
+                    }
+
+                    ChatHolder.status = "connecting";
+                    sendStatus();
+
+                    boolean ok = ChatHolder.chat.connectToServer(ip, 5000);
+
+                    if (ok && ChatHolder.chat.isConnected()) {
+                        ChatHolder.status = "connected";
+                    } else {
+                        ChatHolder.status = "error_client";
+                    }
+
+                    sendStatus();
+
+                } catch (Exception e) {
+
+                    ChatHolder.lastError =
+                            e.getClass().getSimpleName() + ": " + e.getMessage();
+
+                    ChatHolder.status = "error_client";
+                    sendStatus();
+                }
+            }
+        });
+
+        workerThread.start();
+    }
+
+    private void sendStatus() {
+
+        Intent i = new Intent(ChatHolder.ACTION_STATUS);
+        i.putExtra("status", ChatHolder.status);
+        i.putExtra("error", ChatHolder.lastError);
+        sendBroadcast(i);
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+}

@@ -1,0 +1,94 @@
+package com.joelmir.chatwifi;
+
+import android.app.Activity;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.*;
+
+public class ConfigActivity extends Activity {
+
+    EditText editNome;
+    Button btnSalvar;
+    RadioGroup radioModo;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        setContentView(R.layout.config);
+
+        editNome = (EditText) findViewById(R.id.editNome);
+        btnSalvar = (Button) findViewById(R.id.btnSalvar);
+        radioModo = (RadioGroup) findViewById(R.id.radioModo);
+
+        final SharedPreferences prefs =
+                getSharedPreferences("chat", MODE_PRIVATE);
+
+        // =========================
+        // RESTAURA NOME
+        // =========================
+        editNome.setText(prefs.getString("nome", ""));
+
+        // =========================
+        // RESTAURA MODO
+        // =========================
+        String modoSalvo = prefs.getString("modo", "client");
+
+        if ("server".equals(modoSalvo)) {
+            radioModo.check(R.id.radioServer);
+        } else {
+            radioModo.check(R.id.radioClient);
+        }
+
+        // =========================
+        // SALVAR CONFIGURAÇÃO
+        // =========================
+        btnSalvar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                String nome = editNome.getText().toString();
+
+                if (nome == null || nome.trim().length() == 0) {
+                    Toast.makeText(
+                            ConfigActivity.this,
+                            "Digite um nome!",
+                            Toast.LENGTH_SHORT
+                    ).show();
+                    return;
+                }
+
+                int selectedId = radioModo.getCheckedRadioButtonId();
+
+                String modo;
+
+                if (selectedId == R.id.radioServer) {
+                    modo = "server";
+                } else {
+                    modo = "client";
+                }
+
+                nome = nome.trim();
+
+                prefs.edit()
+                        .putString("nome", nome)
+                        .putString("modo", modo)
+                        .commit();
+
+                // =========================
+                // ATUALIZA ESTADO GLOBAL
+                // =========================
+                ChatHolder.mode = modo;
+
+                Toast.makeText(
+                        ConfigActivity.this,
+                        "Salvo!",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                finish();
+            }
+        });
+    }
+}

@@ -1,0 +1,59 @@
+EditText editNome;
+EditText editIp;
+Button btnSalvar;
+RadioGroup radioModo;
+
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.config);
+
+    editNome = (EditText) findViewById(R.id.editNome);
+    editIp = (EditText) findViewById(R.id.editIp);
+    radioModo = (RadioGroup) findViewById(R.id.radioModo);
+    btnSalvar = (Button) findViewById(R.id.btnSalvar);
+
+    final SharedPreferences prefs =
+            getSharedPreferences("chat", MODE_PRIVATE);
+
+    editNome.setText(prefs.getString("nome", ""));
+    editIp.setText(prefs.getString("ip", ""));
+
+    String modo = prefs.getString("modo", "client");
+
+    if ("server".equals(modo)) {
+        radioModo.check(R.id.radioServer);
+    } else {
+        radioModo.check(R.id.radioClient);
+    }
+
+    btnSalvar.setOnClickListener(new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+
+            String nome = editNome.getText().toString().trim();
+            String ip = editIp.getText().toString().trim();
+
+            int selected = radioModo.getCheckedRadioButtonId();
+            String modo;
+
+            if (selected == R.id.radioServer) {
+                modo = "server";
+            } else {
+                modo = "client";
+            }
+
+            SharedPreferences.Editor e = prefs.edit();
+            e.putString("nome", nome);
+            e.putString("modo", modo);
+            e.putString("ip", ip);
+            e.commit();
+
+            Toast.makeText(ConfigActivity.this,
+                    "Configuração salva",
+                    Toast.LENGTH_SHORT).show();
+
+            finish();
+        }
+    });
+}

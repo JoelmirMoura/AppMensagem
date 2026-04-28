@@ -1,0 +1,114 @@
+package com.joelmir.chatwifi;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.*;
+
+public class ConfigActivity extends Activity {
+
+    EditText editNome;
+    EditText editIp;
+    Button btnSalvar;
+    RadioGroup radioModo;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.config);
+
+        editNome = (EditText) findViewById(R.id.editNome);
+        editIp = (EditText) findViewById(R.id.editIp);
+        radioModo = (RadioGroup) findViewById(R.id.radioModo);
+        btnSalvar = (Button) findViewById(R.id.btnSalvar);
+
+        final SharedPreferences prefs =
+                getSharedPreferences("chat", MODE_PRIVATE);
+
+        editNome.setText(prefs.getString("nome", ""));
+        editIp.setText(prefs.getString("ip", ""));
+
+        final String modo = prefs.getString("modo", "client");
+
+        if ("server".equals(modo)) {
+            radioModo.check(R.id.radioServer);
+            editIp.setEnabled(false);
+        } else {
+            radioModo.check(R.id.radioClient);
+            editIp.setEnabled(true);
+        }
+
+        radioModo.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+
+                if (checkedId == R.id.radioServer) {
+                    editIp.setEnabled(false);
+                    editIp.setText("");
+                } else {
+                    editIp.setEnabled(true);
+                }
+            }
+        });
+
+        btnSalvar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                String nome = editNome.getText().toString().trim();
+
+                int selected = radioModo.getCheckedRadioButtonId();
+                String modo;
+
+                String ip = "";
+
+                if (selected == R.id.radioServer) {
+                    modo = "server";
+                } else {
+                    modo = "client";
+                    ip = editIp.getText().toString().trim();
+
+                    // validação simples (evita loop infinito no client)
+                    if (ip.length() < 7) {
+                        Toast.makeText(ConfigActivity.this,
+                                "IP inválido",
+                                Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                }
+
+                // =========================
+                // SALVA CONFIG
+                // =========================
+                SharedPreferences.Editor e = prefs.edit();
+                e.putString("nome", nome);
+                e.putString("modo", modo);
+                e.putString("ip", ip);
+                e.apply(); // melhor que commit aqui
+
+                // =========================
+                // 🔥 REINICIO CONTROLADO
+                // =========================
+                Intent serviceIntent =
+                        new Intent(ConfigActivity.this, ChatService.class);
+
+                try {
+                    stopService(serviceIntent);
+                } catch (Exception ignored) {}
+
+                ChatHolder.reset();
+
+                // pequeno delay lógico evita race condition
+                startService(serviceIntent);
+
+                Toast.makeText(ConfigActivity.this,
+                        "Configuração atualizada",
+                        Toast.LENGTH_SHORT).show();
+
+                finish();
+            }
+        });
+    }
+}

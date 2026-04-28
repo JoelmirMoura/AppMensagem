@@ -1,0 +1,80 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:padding="4dp">
+
+    <!-- BARRA SUPERIOR -->
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="40dp"
+        android:background="#222222"
+        android:orientation="horizontal"
+        android:paddingLeft="6dp"
+        android:paddingRight="6dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/txtTitulo"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Chat Família Moura"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:singleLine="true" />
+
+        <Button
+            android:id="@+id/btnConfig"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:text="⚙"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <!-- STATUS -->
+    <TextView
+        android:id="@+id/txtStatus"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="🔄 Inicializando..."
+        android:gravity="center"
+        android:padding="6dp"
+        android:textStyle="bold" />
+
+    <!-- CHAT -->
+    <ScrollView
+        android:id="@+id/scrollChat"
+        android:layout_width="fill_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/chatContainer"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="10dp" />
+    </ScrollView>
+
+    <!-- INPUT -->
+    <EditText
+        android:id="@+id/editMensagem"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:hint="Digite sua mensagem"
+        android:singleLine="true"
+        android:imeOptions="actionSend"
+        android:inputType="text" />
+
+    <!-- ENVIAR -->
+    <Button
+        android:id="@+id/btnEnviar"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Enviar" />
+
+</LinearLayout>

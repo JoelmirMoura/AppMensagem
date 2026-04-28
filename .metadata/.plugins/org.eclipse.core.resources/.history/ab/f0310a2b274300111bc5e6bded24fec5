@@ -1,0 +1,46 @@
+package com.joelmir.chatwifi;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ChatHolder {
+
+    public static ChatConnection chat;
+
+    public static String lastError = "";
+    public static String mode = "client";
+    public static boolean isServer = false;
+    public static String serverIp = "";
+
+    public static boolean isStarted = false;
+
+    public static String status = "idle";
+
+    public static final String ACTION_STATUS =
+            "com.joelmir.chatwifi.STATUS_UPDATE";
+
+    // 🔥 NOVO: histórico de mensagens
+    public static List<String> messages = new ArrayList<String>();
+
+    public static void addMessage(String msg) {
+        messages.add(msg);
+
+        // opcional: limitar memória
+        if (messages.size() > 200) {
+            messages.remove(0);
+        }
+    }
+
+    public static void reset() {
+        chat = null;
+        mode = "client";
+        isServer = false;
+        isStarted = false;
+        status = "idle";
+        serverIp = "";
+        lastError = "";
+
+        messages.clear(); // 🔥 importante
+    }
+}

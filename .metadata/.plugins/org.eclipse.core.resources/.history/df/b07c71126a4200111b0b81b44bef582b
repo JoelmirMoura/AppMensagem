@@ -1,0 +1,167 @@
+public class ChatConnection {
+
+    private ServerSocket serverSocket;
+    private Socket socket;
+    private PrintWriter out;
+    private BufferedReader in;
+
+    private volatile boolean connected = false;
+
+    private DatagramSocket discoverySocket;
+
+    // =========================
+    // DISCOVERY SERVER
+    // =========================
+    public void startDiscoveryServer() {
+
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+
+                    discoverySocket = new DatagramSocket(8888);
+                    discoverySocket.setSoTimeout(0);
+
+                    byte[] buffer = new byte[256];
+
+                    while (!discoverySocket.isClosed()) {
+
+                        DatagramPacket packet =
+                                new DatagramPacket(buffer, buffer.length);
+
+                        discoverySocket.receive(packet);
+
+                        String msg = new String(
+                                packet.getData(),
+                                0,
+                                packet.getLength()
+                        );
+
+                        if ("DISCOVER_SERVER".equals(msg)) {
+
+                            String response = "SERVER_HERE";
+
+                            DatagramPacket responsePacket =
+                                    new DatagramPacket(
+                                            response.getBytes(),
+                                            response.length(),
+                                            packet.getAddress(),
+                                            packet.getPort()
+                                    );
+
+                            discoverySocket.send(responsePacket);
+                        }
+                    }
+
+                } catch (Exception e) {
+                    Log.d("CHAT", "UDP server erro: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+
+    // =========================
+    // DISCOVERY CLIENT (CORRIGIDO)
+    // =========================
+    public String discoverServer() {
+
+        DatagramSocket ds = null;
+
+        try {
+            ds = new DatagramSocket();
+            ds.setBroadcast(true);
+            ds.setSoTimeout(2000); // 🔥 importante
+
+            byte[] sendData = "DISCOVER_SERVER".getBytes();
+
+            DatagramPacket sendPacket =
+                    new DatagramPacket(
+                            sendData,
+                            sendData.length,
+                            InetAddress.getByName("255.255.255.255"),
+                            8888
+                    );
+
+            ds.send(sendPacket);
+
+            byte[] recv = new byte[256];
+
+            DatagramPacket receivePacket =
+                    new DatagramPacket(recv, recv.length);
+
+            ds.receive(receivePacket);
+
+            String msg = new String(
+                    receivePacket.getData(),
+                    0,
+                    receivePacket.getLength()
+            );
+
+            if ("SERVER_HERE".equals(msg)) {
+                return receivePacket.getAddress().getHostAddress();
+            }
+
+        } catch (Exception e) {
+            Log.d("CHAT", "Discovery falhou: " + e.getMessage());
+        } finally {
+            if (ds != null) ds.close();
+        }
+
+        return null;
+    }
+
+    // =========================
+    // SERVER
+    // =========================
+    public synchronized void startServer(int port) {
+
+        try {
+            close();
+
+            serverSocket = new ServerSocket(port);
+            socket = serverSocket.accept();
+
+            setupConnection();
+
+        } catch (Exception e) {
+            Log.d("CHAT", "Server erro: " + e.getMessage());
+        }
+    }
+
+    // =========================
+    // CLIENT
+    // =========================
+    public synchronized void connectToServer(String ip, int port) {
+
+        try {
+            close();
+
+            socket = new Socket();
+            socket.connect(new InetSocketAddress(ip, port), 4000);
+
+            setupConnection();
+
+        } catch (Exception e) {
+            Log.d("CHAT", "Client erro: " + e.getMessage());
+        }
+    }
+
+    // =========================
+    // SETUP (CORRIGIDO)
+    // =========================
+    private void setupConnection() throws Exception {
+
+        out = new PrintWriter(socket.getOutputStream(), true);
+        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+        connected = true;
+
+        startListening();
+        startHeartbeat();
+    }
+
+    public boolean isConnected() {
+        return connected;
+    }
+
+    // resto do código permanece igual...
+}

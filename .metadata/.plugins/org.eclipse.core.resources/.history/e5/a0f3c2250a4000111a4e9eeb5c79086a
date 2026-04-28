@@ -1,0 +1,41 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
+
+    <Button
+        android:id="@+id/btnServidor"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Iniciar Servidor" />
+
+    <Button
+        android:id="@+id/btnCliente"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Conectar como Cliente"
+        android:layout_marginTop="20dp" />
+
+    <!-- 👇 NOVO CAMPO PARA DIGITAR -->
+    <EditText
+        android:id="@+id/editMensagem"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:hint="Digite sua mensagem aqui"
+        android:layout_marginTop="20dp" />
+
+    <Button
+        android:id="@+id/btnEnviar"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Enviar" />
+
+    <TextView
+        android:id="@+id/txtChat"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Chat iniciado..."
+        android:layout_marginTop="20dp" />
+
+</LinearLayout>

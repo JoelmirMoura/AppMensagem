@@ -1,0 +1,70 @@
+package com.joelmir.chatwifi;
+
+import android.content.Context;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
+
+public class NetworkUtil {
+
+    // =========================
+    // WIFI IP (CORRIGIDO)
+    // =========================
+    public static String getWifiIp(Context context) {
+
+        try {
+            WifiManager wifiManager =
+                    (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+
+            if (wifiManager == null) return "0.0.0.0";
+
+            WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+
+            if (wifiInfo == null) return "0.0.0.0";
+
+            int ipAddress = wifiInfo.getIpAddress();
+
+            if (ipAddress == 0) {
+                return "0.0.0.0";
+            }
+
+            return String.format("%d.%d.%d.%d",
+                    (ipAddress & 0xff),
+                    (ipAddress >> 8 & 0xff),
+                    (ipAddress >> 16 & 0xff),
+                    (ipAddress >> 24 & 0xff));
+
+        } catch (Exception e) {
+            return "0.0.0.0";
+        }
+    }
+
+    // =========================
+    // FALLBACK (3G / OUTRAS REDES)
+    // =========================
+    public static String getLocalIpAddress() {
+
+        try {
+            for (Enumeration<NetworkInterface> en =
+                 NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();) {
+
+                NetworkInterface intf = en.nextElement();
+
+                for (Enumeration<InetAddress> enumIpAddr =
+                     intf.getInetAddresses(); enumIpAddr.hasMoreElements();) {
+
+                    InetAddress inetAddress = enumIpAddr.nextElement();
+
+                    if (!inetAddress.isLoopbackAddress()) {
+                        return inetAddress.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return "0.0.0.0";
+    }
+}

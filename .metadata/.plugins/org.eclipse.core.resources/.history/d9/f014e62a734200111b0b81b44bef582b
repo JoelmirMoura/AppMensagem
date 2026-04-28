@@ -1,0 +1,51 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
+
+    <EditText
+        android:id="@+id/editNome"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:hint="Digite seu nome"
+        android:inputType="textPersonName" />
+
+    <!-- IP DO SERVIDOR -->
+    <EditText
+        android:id="@+id/editIp"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:hint="IP do servidor (ex: 192.168.0.10)"
+        android:inputType="text"
+        android:layout_marginTop="10dp" />
+
+    <RadioGroup
+        android:id="@+id/radioModo"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="10dp">
+
+        <RadioButton
+            android:id="@+id/radioServer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Servidor" />
+
+        <RadioButton
+            android:id="@+id/radioClient"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cliente"
+            android:checked="true" />
+
+    </RadioGroup>
+
+    <Button
+        android:id="@+id/btnSalvar"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Salvar"
+        android:layout_marginTop="10dp" />
+
+</LinearLayout>

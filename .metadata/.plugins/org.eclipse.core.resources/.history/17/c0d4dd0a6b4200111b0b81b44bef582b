@@ -1,0 +1,33 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
+
+    <EditText
+        android:id="@+id/editNome"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:hint="Digite seu nome"/>
+
+    <Button
+        android:id="@+id/btnSalvar"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Salvar"/>
+        
+        <RadioGroup
+    android:id="@+id/radioModo"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <RadioButton
+        android:id="@+id/radioServer"
+        android:text="Servidor" />
+
+    <RadioButton
+        android:id="@+id/radioClient"
+        android:text="Cliente" />
+
+</RadioGroup>
+</LinearLayout>

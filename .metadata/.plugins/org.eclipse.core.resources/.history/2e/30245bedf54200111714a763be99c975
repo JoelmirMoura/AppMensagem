@@ -1,0 +1,56 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
+
+    <!-- NOME -->
+    <EditText
+        android:id="@+id/editNome"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:hint="Digite seu nome"
+        android:inputType="textPersonName" />
+
+    <!-- MODO -->
+    <RadioGroup
+        android:id="@+id/radioModo"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="12dp">
+
+        <RadioButton
+            android:id="@+id/radioServer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Servidor (cria sala)" />
+
+        <RadioButton
+            android:id="@+id/radioClient"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cliente (conecta em sala)"
+            android:checked="true" />
+
+    </RadioGroup>
+
+    <!-- IP DO SERVIDOR -->
+    <EditText
+        android:id="@+id/editIp"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:hint="IP do servidor (apenas cliente)"
+        android:inputType="text"
+        android:layout_marginTop="12dp"
+        android:enabled="true"
+        android:singleLine="true" />
+
+    <!-- BOTÃO -->
+    <Button
+        android:id="@+id/btnSalvar"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Salvar"
+        android:layout_marginTop="12dp" />
+
+</LinearLayout>

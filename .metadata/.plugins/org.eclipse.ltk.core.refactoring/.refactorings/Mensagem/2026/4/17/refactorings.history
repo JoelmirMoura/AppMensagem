@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Move element &apos;MainActivity.java&apos; to &apos;Mensagem/src/com.joelmir.chatwifi&apos;&#x0D;&#x0A;- Original project: &apos;Mensagem&apos;&#x0D;&#x0A;- Destination element: &apos;Mensagem/src/com.joelmir.chatwifi&apos;&#x0D;&#x0A;- Original element: &apos;MainActivity.java&apos;&#x0D;&#x0A;- Update references to refactored element" description="Move compilation unit" destination="/src&lt;com.joelmir.chatwifi" element1="/src&lt;{MainActivity.java" files="0" flags="589830" folders="0" id="org.eclipse.jdt.ui.move" policy="org.eclipse.jdt.ui.moveResources" qualified="false" references="true" stamp="1776981338142" units="1" version="1.0"/>
+</session>

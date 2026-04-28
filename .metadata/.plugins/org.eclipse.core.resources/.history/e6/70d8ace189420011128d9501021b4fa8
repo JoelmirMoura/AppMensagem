@@ -1,0 +1,20 @@
+public class ChatHolder {
+
+    public static ChatConnection chat;
+    public static String status = "";
+    public static String mode = "";
+    public static boolean isServer = false;
+
+    public static String serverIp = "";
+
+    public static final String ACTION_STATUS =
+            "com.joelmir.chatwifi.STATUS";
+
+    public static void reset() {
+        chat = null;
+        status = "";
+        mode = "";
+        isServer = false;
+        serverIp = "";
+    }
+}

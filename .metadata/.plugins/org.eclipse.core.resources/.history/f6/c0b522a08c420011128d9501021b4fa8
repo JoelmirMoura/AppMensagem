@@ -1,0 +1,115 @@
+package com.joelmir.chatwifi;
+
+import android.app.Service;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.IBinder;
+
+public class ChatService extends Service {
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+
+        SharedPreferences prefs =
+                getSharedPreferences("chat", MODE_PRIVATE);
+
+        String modo = prefs.getString("modo", "client");
+        String ip = prefs.getString("ip", "");
+
+        // 🔥 GARANTE CHAT NÃO NULO
+        if (ChatHolder.chat == null) {
+            ChatHolder.chat = new ChatConnection();
+        }
+
+        sendStatus("initializing");
+
+        if ("server".equals(modo)) {
+            startServer();
+        } else {
+            startClient(ip);
+        }
+
+        return START_STICKY;
+    }
+
+    // =========================
+    private void startServer() {
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                sendStatus("starting_server");
+
+                try {
+
+                    if (ChatHolder.chat == null) {
+                        sendStatus("error_server");
+                        return;
+                    }
+
+                    boolean ok = ChatHolder.chat.startServer(5000);
+
+                    if (!ok) {
+                        sendStatus("error_server");
+                        return;
+                    }
+
+                    String ip = NetworkUtil.getWifiIp(getApplicationContext());
+
+                    ChatHolder.serverIp = ip;
+
+                    sendStatus("server_ready");
+
+                } catch (Exception e) {
+                    sendStatus("error_server");
+                }
+            }
+        }).start();
+    }
+
+    // =========================
+    private void startClient(final String ip) {
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                sendStatus("connecting");
+
+                try {
+
+                    if (ip == null || ip.trim().length() == 0) {
+                        sendStatus("error_connect");
+                        return;
+                    }
+
+                    boolean ok = ChatHolder.chat.connectToServer(ip, 5000);
+
+                    if (ok) {
+                        sendStatus("connected");
+                    } else {
+                        sendStatus("error_connect");
+                    }
+
+                } catch (Exception e) {
+                    sendStatus("error_client");
+                }
+            }
+        }).start();
+    }
+
+    // =========================
+    private void sendStatus(String status) {
+        ChatHolder.status = status;
+
+        Intent i = new Intent(ChatHolder.ACTION_STATUS);
+        i.putExtra("status", status);
+        sendBroadcast(i);
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+}

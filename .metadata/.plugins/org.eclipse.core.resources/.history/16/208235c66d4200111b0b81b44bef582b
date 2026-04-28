@@ -1,0 +1,14 @@
+package com.joelmir.chatwifi;
+
+public class ChatHolder {
+
+    public static ChatConnection chat;
+
+    public static String mode = "client";
+    public static boolean isServer = false;
+
+    // 🔥 ESTADO GLOBAL DO APP
+    public static String status = "initializing";
+
+    public static final String ACTION_STATUS = "com.joelmir.chatwifi.STATUS_UPDATE";
+}

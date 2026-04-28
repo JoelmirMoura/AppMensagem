@@ -1,0 +1,211 @@
+package com.joelmir.chatwifi;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.os.Handler;
+import android.view.View;
+import android.widget.*;
+
+import java.util.regex.Pattern;
+
+public class ConfigActivity extends Activity {
+
+    EditText editNome;
+    EditText editIp;
+    Button btnSalvar;
+    Button btnVoltar;
+    RadioGroup radioModo;
+
+    private boolean isDestroyed = false;
+
+    private static final Pattern IP_PATTERN =
+            Pattern.compile(
+                    "^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}" +
+                    "(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$"
+            );
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.config);
+
+        editNome = (EditText) findViewById(R.id.editNome);
+        editIp = (EditText) findViewById(R.id.editIp);
+        radioModo = (RadioGroup) findViewById(R.id.radioModo);
+        btnSalvar = (Button) findViewById(R.id.btnSalvar);
+        btnVoltar = (Button) findViewById(R.id.btnVoltar);
+
+        final SharedPreferences prefs =
+                getSharedPreferences("chat", MODE_PRIVATE);
+
+        editNome.setText(prefs.getString("nome", ""));
+        editIp.setText(prefs.getString("ip", ""));
+
+        String modoSalvo = prefs.getString("modo", "client");
+
+        if ("server".equals(modoSalvo)) {
+
+            radioModo.check(R.id.radioServer);
+
+            editIp.setEnabled(false);
+            editIp.setText("Gerando IP...");
+
+            atualizarIpComDelay(0);
+
+        } else {
+
+            radioModo.check(R.id.radioClient);
+
+            editIp.setEnabled(true);
+            editIp.setText(prefs.getString("ip", ""));
+        }
+
+        // =========================
+        // TROCA DE MODO
+        // =========================
+        radioModo.setOnCheckedChangeListener(
+                new RadioGroup.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(RadioGroup group, int checkedId) {
+
+                        if (checkedId == R.id.radioServer) {
+
+                            editIp.setEnabled(false);
+                            editIp.setText("Gerando IP...");
+
+                            atualizarIpComDelay(0);
+
+                        } else {
+
+                            editIp.setEnabled(true);
+                            editIp.setText("");
+                        }
+                    }
+                });
+
+        // =========================
+        // SALVAR (CORRIGIDO)
+        // =========================
+        btnSalvar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                String nome = editNome.getText().toString().trim();
+                int selected = radioModo.getCheckedRadioButtonId();
+
+                String modo;
+                String ip = "";
+
+                if (selected == R.id.radioServer) {
+                    modo = "server";
+                } else {
+                    modo = "client";
+                    ip = editIp.getText().toString().trim();
+
+                    if (!IP_PATTERN.matcher(ip).matches()) {
+                        Toast.makeText(ConfigActivity.this,
+                                "IP inválido",
+                                Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                }
+
+                // =========================
+                // SALVA CONFIG
+                // =========================
+                SharedPreferences.Editor e = prefs.edit();
+                e.putString("nome", nome);
+                e.putString("modo", modo);
+                e.putString("ip", ip);
+                e.commit();
+
+                // =========================
+                // REINICIA SERVICE (CORRETO)
+                // =========================
+                Intent serviceIntent =
+                        new Intent(ConfigActivity.this, ChatService.class);
+
+                stopService(serviceIntent);
+
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        startService(serviceIntent);
+                    }
+                }, 300);
+
+                if ("server".equals(modo)) {
+                    Toast.makeText(ConfigActivity.this,
+                            "Servidor iniciado",
+                            Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(ConfigActivity.this,
+                            "Conectando ao servidor...",
+                            Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        // =========================
+        btnVoltar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                finish();
+            }
+        });
+    }
+
+    // =========================
+    private void atualizarIpComDelay(final int tentativa) {
+
+        if (isDestroyed) return;
+
+        int selected = radioModo.getCheckedRadioButtonId();
+        if (selected != R.id.radioServer) return;
+
+        if (tentativa > 10) {
+            editIp.setText("Não foi possível obter IP");
+            return;
+        }
+
+        final Handler handler = new Handler();
+
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+
+                if (isDestroyed) return;
+
+                int selected = radioModo.getCheckedRadioButtonId();
+                if (selected != R.id.radioServer) return;
+
+                String meuIp = ChatHolder.serverIp;
+
+                if (meuIp != null && meuIp.length() > 0) {
+
+                    editIp.setText(meuIp);
+
+                    SharedPreferences prefs =
+                            getSharedPreferences("chat", MODE_PRIVATE);
+
+                    SharedPreferences.Editor e = prefs.edit();
+                    e.putString("ip", meuIp);
+                    e.commit();
+
+                } else {
+
+                    editIp.setText("Aguardando IP...");
+                    atualizarIpComDelay(tentativa + 1);
+                }
+            }
+        }, 800);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        isDestroyed = true;
+    }
+}

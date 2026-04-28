@@ -1,0 +1,243 @@
+package com.joelmir.chatwifi;
+
+import android.app.Service;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.net.wifi.WifiManager;
+import android.os.IBinder;
+import android.os.PowerManager;
+import android.util.Log;
+
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class ChatService extends Service {
+
+    private PowerManager.WakeLock wakeLock;
+    private WifiManager.WifiLock wifiLock;
+
+    private ServerSocket serverSocket;
+    private Thread workerThread;
+
+    private volatile boolean running = false;
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+
+        stopCurrent();
+        acquireLocks();
+
+        SharedPreferences prefs = getSharedPreferences("chat", MODE_PRIVATE);
+
+        final String modo = prefs.getString("modo", "client");
+        final String ip = prefs.getString("ip", "");
+        final int port = prefs.getInt("port", 9999);
+
+        ChatHolder.lastError = "";
+        ChatHolder.status = "initializing";
+        sendStatus();
+
+        ChatHolder.chat = new ChatConnection();
+        running = true;
+
+        if ("server".equals(modo)) {
+            startServer(port);
+        } else {
+            startClient(ip);
+        }
+
+        return START_STICKY;
+    }
+
+    // =========================
+    // SERVER (ESTÁVEL)
+    // =========================
+    public void startServer(final int port) {
+
+        workerThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+
+                    serverSocket = new ServerSocket(port);
+
+                    ChatHolder.serverIp =
+                            NetworkUtil.getWifiIp(getApplicationContext());
+
+                    ChatHolder.status = "server_running";
+                    sendStatus();
+
+                    Log.d("SERVER", "IP: " + ChatHolder.serverIp);
+
+                    serverSocket.setReuseAddress(true);
+
+                    while (running) {
+
+                        try {
+
+                            Socket client = serverSocket.accept();
+
+                            if (client != null) {
+
+                                ChatHolder.chat.attachSocket(client);
+
+                                ChatHolder.status = "connected";
+                                sendStatus();
+                            }
+
+                        } catch (Exception e) {
+
+                            if (running) {
+                                ChatHolder.status = "server_error";
+                                ChatHolder.lastError = e.toString();
+                                sendStatus();
+                            }
+                        }
+                    }
+
+                } catch (Exception e) {
+
+                    Log.e("SERVER", "Erro: " + e.getMessage());
+
+                    ChatHolder.lastError = e.toString();
+                    ChatHolder.status = "error_server";
+                    sendStatus();
+                }
+            }
+        });
+
+        workerThread.start();
+    }
+
+    // =========================
+    // CLIENT (ESTÁVEL)
+    // =========================
+    private void startClient(final String ip) {
+
+        workerThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                if (ip == null || ip.trim().length() == 0) {
+                    ChatHolder.status = "error_client";
+                    sendStatus();
+                    return;
+                }
+
+                int attempts = 0;
+
+                while (running && attempts < 5) {
+
+                    try {
+                        attempts++;
+
+                        ChatHolder.status = "connecting";
+                        sendStatus();
+
+                        boolean ok = ChatHolder.chat.connectToServer(
+                                ip.trim(),
+                                9999
+                        );
+
+                        if (ok && ChatHolder.chat.isConnected()) {
+
+                            ChatHolder.status = "connected";
+                            sendStatus();
+                            return;
+                        }
+
+                    } catch (Exception e) {
+
+                        ChatHolder.lastError = e.toString();
+                        ChatHolder.status = "error_client";
+                        sendStatus();
+                    }
+
+                    try {
+                        Thread.sleep(1500);
+                    } catch (Exception ignored) {}
+                }
+
+                ChatHolder.status = "failed_connect";
+                sendStatus();
+            }
+        });
+
+        workerThread.start();
+    }
+
+    // =========================
+    private void sendStatus() {
+        Intent i = new Intent(ChatHolder.ACTION_STATUS);
+        i.putExtra("status", ChatHolder.status);
+        i.putExtra("error", ChatHolder.lastError);
+        sendBroadcast(i);
+    }
+
+    // =========================
+    private void acquireLocks() {
+
+        try {
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            wakeLock = pm.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK,
+                    "Chat:WakeLock"
+            );
+            wakeLock.acquire();
+        } catch (Exception e) {
+            Log.e("CHAT", "WakeLock error", e);
+        }
+
+        try {
+            WifiManager wm = (WifiManager) getApplicationContext()
+                    .getSystemService(WIFI_SERVICE);
+
+            wifiLock = wm.createWifiLock(
+                    WifiManager.WIFI_MODE_FULL,
+                    "Chat:WifiLock"
+            );
+            wifiLock.acquire();
+
+        } catch (Exception e) {
+            Log.e("CHAT", "WifiLock error", e);
+        }
+    }
+
+    // =========================
+    private void stopCurrent() {
+
+        running = false;
+
+        try {
+            if (workerThread != null) workerThread.interrupt();
+        } catch (Exception ignored) {}
+
+        try {
+            if (serverSocket != null) serverSocket.close();
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+
+        stopCurrent();
+
+        try {
+            if (ChatHolder.chat != null) ChatHolder.chat.close();
+
+            if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+
+            if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+
+        } catch (Exception e) {
+            Log.e("CHAT", "destroy error", e);
+        }
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+}

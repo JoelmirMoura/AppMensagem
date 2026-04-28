@@ -1,0 +1,178 @@
+package com.joelmir.chatwifi;
+
+import android.app.Service;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.IBinder;
+import android.util.Log;
+
+public class ChatService extends Service {
+
+    private Thread workerThread;
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+
+        SharedPreferences prefs =
+                getSharedPreferences("chat", MODE_PRIVATE);
+
+        String modo = prefs.getString("modo", "client");
+        String ip = prefs.getString("ip", "");
+
+        ChatHolder.status = "initializing";
+        sendStatus();
+
+        // 🔥 limpa corretamente
+        if (ChatHolder.chat != null) {
+            ChatHolder.chat.close();
+        }
+
+        ChatHolder.chat = new ChatConnection();
+
+        if ("server".equals(modo)) {
+            startServer();
+        } else {
+            startClient(ip);
+        }
+
+        return START_STICKY;
+    }
+
+    // =========================
+    // SERVER (ESTÁVEL)
+    // =========================
+    private void startServer() {
+
+        workerThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+
+                    ChatHolder.status = "starting_server";
+                    sendStatus();
+
+                    boolean started = ChatHolder.chat.startServer(5000);
+
+                    if (!started) {
+                        ChatHolder.status = "error_server";
+                        sendStatus();
+                        return;
+                    }
+
+                    // 🔥 espera conexão REAL (accept concluído)
+                    int timeout = 0;
+
+                    while (!ChatHolder.chat.isConnected() && timeout < 120) {
+                        Thread.sleep(100);
+                        timeout++;
+                    }
+
+                    if (!ChatHolder.chat.isConnected()) {
+                        Log.e("CHAT", "TIMEOUT aguardando cliente");
+                        ChatHolder.status = "error_server";
+                        sendStatus();
+                        return;
+                    }
+
+                    // 🔥 só aqui temos conexão válida
+                    ChatHolder.serverIp =
+                            NetworkUtil.getWifiIp(getApplicationContext());
+
+                    if (ChatHolder.serverIp == null || ChatHolder.serverIp.length() == 0) {
+                        ChatHolder.serverIp = "0.0.0.0";
+                    }
+
+                    ChatHolder.status = "server_ready";
+                    sendStatus();
+
+                    Log.d("CHAT", "Servidor pronto com cliente conectado");
+
+                } catch (Exception e) {
+
+                    Log.e("CHAT", "SERVER ERROR", e);
+
+                    ChatHolder.status = "error_server";
+                    sendStatus();
+                }
+            }
+        });
+
+        workerThread.start();
+    }
+
+    // =========================
+    // CLIENT (ESTÁVEL)
+    // =========================
+    private void startClient(final String ip) {
+
+        workerThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+
+                    if (ip == null || ip.trim().length() == 0) {
+                        ChatHolder.status = "error_client";
+                        sendStatus();
+                        return;
+                    }
+
+                    ChatHolder.status = "connecting";
+                    sendStatus();
+
+                    boolean ok = ChatHolder.chat.connectToServer(ip.trim(), 5000);
+
+                    if (ok && ChatHolder.chat.isConnected()) {
+                        ChatHolder.status = "connected";
+                    } else {
+                        ChatHolder.status = "error_client";
+                    }
+
+                    sendStatus();
+
+                } catch (Exception e) {
+
+                    Log.e("CHAT", "CLIENT ERROR", e);
+
+                    ChatHolder.status = "error_client";
+                    sendStatus();
+                }
+            }
+        });
+
+        workerThread.start();
+    }
+
+    // =========================
+    private void sendStatus() {
+        Intent i = new Intent(ChatHolder.ACTION_STATUS);
+        i.putExtra("status", ChatHolder.status);
+        i.putExtra("error", ChatHolder.lastError); // 🔥 NOVO
+        sendBroadcast(i);
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public void onDestroy() {
+
+        try {
+            if (ChatHolder.chat != null) {
+                ChatHolder.chat.close();
+            }
+
+            if (workerThread != null) {
+                workerThread.interrupt();
+            }
+
+        } catch (Exception e) {
+            Log.e("CHAT", "SERVICE STOP ERROR", e);
+        }
+
+        super.onDestroy();
+    }
+}

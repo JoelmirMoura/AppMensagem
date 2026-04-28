@@ -1,0 +1,47 @@
+package com.joelmir.chatwifi;
+
+public class ChatHolder {
+
+    public static ChatConnection chat;
+
+    public static String mode = "client";
+    public static boolean isServer = false;
+
+    public static String serverIp = "";
+
+    // controle de inicialização
+    public static boolean isStarted = false;
+
+    // status global
+    public static String status = "";
+
+    // broadcast action
+    public static final String ACTION_STATUS =
+            "com.joelmir.chatwifi.STATUS_UPDATE";
+
+    // =========================
+    // RESET TOTAL SEGURO
+    // =========================
+    public static void reset() {
+
+        if (chat != null) {
+            chat.close();
+        }
+
+        chat = null;
+
+        mode = "client";
+        isServer = false;
+        isStarted = false;
+        serverIp = "";   // 🔥 FIX IMPORTANTE
+
+        status = "initializing";
+    }
+
+    // =========================
+    // helper seguro de status
+    // =========================
+    public static void setStatus(String newStatus) {
+        status = newStatus;
+    }
+}

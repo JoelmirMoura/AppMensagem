@@ -1,0 +1,7 @@
+package com.joelmir.chatwifi;
+
+public class ChatHolder {
+    public static ChatConnection chat;
+    public static boolean isServer = false;
+    public static boolean ready = false;
+}

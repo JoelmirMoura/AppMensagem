@@ -1,0 +1,35 @@
+package com.joelmir.chatwifi;
+
+public class ChatHolder {
+
+    public static ChatConnection chat;
+
+    public static String mode = "client";
+    public static boolean isServer = false;
+    public static String serverIp = "";
+    
+    // 🔥 controle de inicialização do Service
+    public static boolean isStarted = false;
+
+    // =========================
+    // STATUS GLOBAL
+    // =========================
+    public static String status = "initializing";
+
+    // =========================
+    // ACTION PARA BROADCAST
+    // =========================
+    public static final String ACTION_STATUS =
+            "com.joelmir.chatwifi.STATUS_UPDATE";
+
+    // =========================
+    // RESET SE NECESSÁRIO
+    // =========================
+    public static void reset() {
+        chat = null;
+        mode = "client";
+        isServer = false;
+        isStarted = false;
+        status = "initializing";
+    }
+}

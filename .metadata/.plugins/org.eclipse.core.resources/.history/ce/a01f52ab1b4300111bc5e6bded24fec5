@@ -1,0 +1,204 @@
+package com.joelmir.chatwifi;
+
+import android.util.Log;
+import java.io.*;
+import java.net.*;
+
+public class ChatConnection {
+
+    private ServerSocket serverSocket;
+    private Socket socket;
+    private PrintWriter out;
+    private BufferedReader in;
+
+    private volatile boolean connected = false;
+    private volatile boolean listening = false;
+
+    private Thread listenThread;
+    private Thread serverThread;
+
+    private MessageListener listener;
+    private ConnectionListener connectionListener;
+
+    public interface MessageListener {
+        void onMessage(String msg);
+    }
+
+    public interface ConnectionListener {
+        void onClientConnected();
+    }
+
+    public void setMessageListener(MessageListener l) {
+        this.listener = l;
+    }
+
+    public void setConnectionListener(ConnectionListener l) {
+        this.connectionListener = l;
+    }
+
+    // =========================
+    // SERVER
+    // =========================
+    public boolean startServer(final int port) {
+
+        close();
+
+        serverThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+
+                    serverSocket = new ServerSocket(port);
+                    Log.d("CHAT", "Servidor aguardando...");
+
+                    socket = serverSocket.accept();
+
+                    if (socket != null) {
+
+                        Log.d("CHAT", "Cliente conectado!");
+
+                        if (connectionListener != null) {
+                            connectionListener.onClientConnected();
+                        }
+
+                        setupConnection();
+                    }
+
+                } catch (Exception e) {
+
+                    Log.e("CHAT", "SERVER ERROR", e);
+
+                    ChatHolder.lastError =
+                            e.getClass().getSimpleName() + ": " + e.getMessage();
+                }
+            }
+        });
+
+        serverThread.start();
+        return true;
+    }
+
+    // =========================
+    // CLIENT
+    // =========================
+    public boolean connectToServer(String ip, int port) {
+
+        try {
+
+            close();
+
+            socket = new Socket();
+            InetSocketAddress address = new InetSocketAddress(ip.trim(), port);
+
+            socket = new Socket();
+            socket.setReuseAddress(true);
+            socket.setKeepAlive(true);
+
+            socket.connect(address, 3000);
+
+            setupConnection();
+
+            return true;
+
+        } catch (Exception e) {
+
+            Log.e("CHAT", "CLIENT ERROR", e);
+
+            ChatHolder.lastError =
+                    e.getClass().getSimpleName() + ": " + e.getMessage();
+
+            connected = false;
+            return false;
+        }
+    }
+
+    // =========================
+    private void setupConnection() throws Exception {
+
+        out = new PrintWriter(
+                new BufferedWriter(
+                        new OutputStreamWriter(socket.getOutputStream())
+                ), true);
+
+        in = new BufferedReader(
+                new InputStreamReader(socket.getInputStream())
+        );
+
+        connected = true;
+        startListening();
+    }
+
+    // =========================
+    private void startListening() {
+
+        listening = true;
+
+        listenThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+
+                    String line;
+
+                    while (listening &&
+                            connected &&
+                            (line = in.readLine()) != null) {
+
+                        if (listener != null) {
+                            listener.onMessage(line);
+                        }
+                    }
+
+                } catch (Exception e) {
+
+                    Log.e("CHAT", "LISTEN ERROR", e);
+
+                    ChatHolder.lastError =
+                            e.getClass().getSimpleName() + ": " + e.getMessage();
+                }
+            }
+        });
+
+        listenThread.start();
+    }
+
+    // =========================
+    public synchronized void sendMessage(String msg) {
+
+        try {
+            if (out != null && connected) {
+                out.println(msg);
+                out.flush();
+            }
+        } catch (Exception e) {
+
+            Log.e("CHAT", "SEND ERROR", e);
+
+            ChatHolder.lastError =
+                    e.getClass().getSimpleName() + ": " + e.getMessage();
+        }
+    }
+
+    // =========================
+    public synchronized void close() {
+
+        connected = false;
+        listening = false;
+
+        try {
+            if (socket != null) socket.close();
+            if (serverSocket != null) serverSocket.close();
+        } catch (Exception ignored) {}
+
+        socket = null;
+        serverSocket = null;
+        out = null;
+        in = null;
+    }
+
+    public boolean isConnected() {
+        return connected && socket != null && socket.isConnected();
+    }
+}

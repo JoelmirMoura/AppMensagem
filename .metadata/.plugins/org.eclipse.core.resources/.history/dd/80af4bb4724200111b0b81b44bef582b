@@ -1,0 +1,30 @@
+package com.joelmir.chatwifi;
+
+public class ChatHolder {
+
+    public static ChatConnection chat;
+
+    public static String mode = "client";
+    public static boolean isServer = false;
+
+    // =========================
+    // STATUS GLOBAL
+    // =========================
+    public static String status = "initializing";
+
+    // =========================
+    // ACTION PARA BROADCAST
+    // =========================
+    public static final String ACTION_STATUS =
+            "com.joelmir.chatwifi.STATUS_UPDATE";
+
+    // =========================
+    // RESET SE NECESSÁRIO
+    // =========================
+    public static void reset() {
+        chat = null;
+        mode = "client";
+        isServer = false;
+        status = "initializing";
+    }
+}

@@ -1,0 +1,55 @@
+package com.joelmir.chatwifi;
+
+import android.app.Activity;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.*;
+
+public class ConfigActivity extends Activity {
+
+    EditText editNome;
+    Button btnSalvar;
+    RadioGroup radioModo;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        setContentView(R.layout.config);
+
+        editNome = (EditText) findViewById(R.id.editNome);
+        btnSalvar = (Button) findViewById(R.id.btnSalvar);
+        radioModo = (RadioGroup) findViewById(R.id.radioModo);
+
+        final SharedPreferences prefs = getSharedPreferences("chat", MODE_PRIVATE);
+
+        editNome.setText(prefs.getString("nome", ""));
+
+        btnSalvar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                String nome = editNome.getText().toString().trim();
+
+                if (nome.isEmpty()) {
+                    Toast.makeText(ConfigActivity.this, "Digite um nome!", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                String modo = (radioModo.getCheckedRadioButtonId() == R.id.radioServer)
+                        ? "server"
+                        : "client";
+
+                prefs.edit()
+                        .putString("nome", nome)
+                        .putString("modo", modo)
+                        .commit();
+
+                Toast.makeText(ConfigActivity.this, "Salvo!", Toast.LENGTH_SHORT).show();
+
+                finish();
+            }
+        });
+    }
+}

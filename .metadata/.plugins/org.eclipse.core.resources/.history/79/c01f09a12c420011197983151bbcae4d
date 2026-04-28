@@ -1,0 +1,63 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
+
+
+	<EditText
+    	android:id="@+id/editNome"
+    	android:layout_width="match_parent"
+    	android:layout_height="wrap_content"
+    	android:hint="Seu nome"/>
+    <!-- 🔹 BOTÃO ÚNICO -->
+    <Button
+        android:id="@+id/btnServidor"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Iniciar Serviço" />
+
+    <!-- 🔥 STATUS -->
+    <TextView
+        android:id="@+id/txtStatus"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="🔴 Offline"
+        android:padding="6dp"
+        android:gravity="center"
+        android:textStyle="bold" />
+
+    <!-- 🔥 ÁREA DO CHAT -->
+    <ScrollView
+        android:id="@+id/scrollChat"
+        android:layout_width="fill_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:id="@+id/chatContainer"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="10dp" />
+
+    </ScrollView>
+
+    <!-- 🔹 DIGITAÇÃO -->
+    <EditText
+        android:id="@+id/editMensagem"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:hint="Digite sua mensagem"
+        android:singleLine="true"
+        android:layout_marginTop="8dp" />
+
+    <!-- 🔹 ENVIAR -->
+    <Button
+        android:id="@+id/btnEnviar"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Enviar" />
+
+</LinearLayout>

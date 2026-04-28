@@ -1,0 +1,51 @@
+public boolean startServer(final int port) {
+
+    close();
+
+    runningServer = true;
+
+    serverThread = new Thread(new Runnable() {
+        @Override
+        public void run() {
+
+            try {
+
+                serverSocket = new ServerSocket(port);
+                serverSocket.setSoTimeout(2000);
+
+                Log.d("CHAT", "Servidor iniciado");
+
+                while (runningServer) {
+
+                    try {
+
+                        socket = serverSocket.accept();
+
+                        if (socket != null) {
+
+                            Log.d("CHAT", "Cliente conectado");
+
+                            setupConnection();
+
+                            return;
+                        }
+
+                    } catch (SocketTimeoutException ignored) {
+                        // loop controlado
+                    }
+                }
+
+            } catch (Exception e) {
+
+                Log.d("CHAT", "server erro: " + e.getMessage());
+
+                connected = false;
+            }
+        }
+    });
+
+    serverThread.start();
+
+    // 🔥 NÃO assume sucesso imediato
+    return true;
+}

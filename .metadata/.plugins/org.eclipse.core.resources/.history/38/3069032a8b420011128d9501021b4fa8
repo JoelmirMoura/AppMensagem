@@ -1,0 +1,33 @@
+package com.joelmir.chatwifi;
+
+public class ChatHolder {
+
+    public static ChatConnection chat;
+
+    public static String mode = "client";
+    public static boolean isServer = false;
+
+    public static String serverIp = "";
+
+    public static boolean isStarted = false;
+
+    public static String status = "";
+
+    public static final String ACTION_STATUS =
+            "com.joelmir.chatwifi.STATUS_UPDATE";
+
+    public static void reset() {
+
+        if (chat != null) {
+            chat.close();
+        }
+
+        chat = null;
+
+        mode = "client";
+        isServer = false;
+        isStarted = false;
+        serverIp = "";
+        status = "initializing";
+    }
+}

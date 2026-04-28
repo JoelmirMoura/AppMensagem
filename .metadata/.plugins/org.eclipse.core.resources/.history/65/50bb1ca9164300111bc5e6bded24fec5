@@ -1,0 +1,26 @@
+public class ChatHolder {
+
+    public static ChatConnection chat;
+
+    public static String lastError = "";
+    public static String mode = "client";
+    public static boolean isServer = false;
+    public static String serverIp = "";
+
+    public static boolean isStarted = false;
+
+    public static String status = "idle";
+
+    public static final String ACTION_STATUS =
+            "com.joelmir.chatwifi.STATUS_UPDATE";
+
+    public static void reset() {
+        chat = null;
+        mode = "client";
+        isServer = false;
+        isStarted = false;
+        status = "idle";
+        serverIp = "";
+        lastError = "";
+    }
+}

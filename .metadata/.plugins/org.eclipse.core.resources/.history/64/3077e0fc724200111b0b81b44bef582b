@@ -1,0 +1,299 @@
+package com.joelmir.chatwifi;
+
+import android.util.Log;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.*;
+
+public class ChatConnection {
+
+    private ServerSocket serverSocket;
+    private Socket socket;
+    private PrintWriter out;
+    private BufferedReader in;
+
+    private volatile boolean connected = false;
+
+    private DatagramSocket discoverySocket;
+
+    private Thread listenThread;
+
+    private MessageListener listener;
+    private ConnectionListener connectionListener;
+    private DisconnectListener disconnectListener;
+
+    // =========================
+    // INTERFACES
+    // =========================
+    public interface MessageListener {
+        void onMessage(String msg);
+    }
+
+    public interface ConnectionListener {
+        void onConnected();
+    }
+
+    public interface DisconnectListener {
+        void onDisconnected();
+    }
+
+    public void setMessageListener(MessageListener l) {
+        this.listener = l;
+    }
+
+    public void setConnectionListener(ConnectionListener l) {
+        this.connectionListener = l;
+    }
+
+    public void setDisconnectListener(DisconnectListener l) {
+        this.disconnectListener = l;
+    }
+
+    // =========================
+    // DISCOVERY SERVER
+    // =========================
+    public void startDiscoveryServer() {
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+
+                    discoverySocket = new DatagramSocket(8888);
+                    byte[] buffer = new byte[256];
+
+                    Log.d("CHAT", "UDP SERVER ativo");
+
+                    while (!discoverySocket.isClosed()) {
+
+                        DatagramPacket packet =
+                                new DatagramPacket(buffer, buffer.length);
+
+                        discoverySocket.receive(packet);
+
+                        String msg = new String(packet.getData(), 0, packet.getLength());
+
+                        if ("DISCOVER_SERVER".equals(msg)) {
+
+                            byte[] resp = "SERVER_HERE".getBytes();
+
+                            DatagramPacket response =
+                                    new DatagramPacket(
+                                            resp,
+                                            resp.length,
+                                            packet.getAddress(),
+                                            packet.getPort()
+                                    );
+
+                            discoverySocket.send(response);
+                        }
+                    }
+
+                } catch (Exception e) {
+                    Log.d("CHAT", "UDP server fim: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+
+    // =========================
+    // DISCOVERY CLIENT
+    // =========================
+    public String discoverServer() {
+
+        DatagramSocket ds = null;
+
+        try {
+            ds = new DatagramSocket();
+            ds.setBroadcast(true);
+            ds.setSoTimeout(2500);
+
+            byte[] send = "DISCOVER_SERVER".getBytes();
+
+            DatagramPacket packet = new DatagramPacket(
+                    send,
+                    send.length,
+                    InetAddress.getByName("255.255.255.255"),
+                    8888
+            );
+
+            ds.send(packet);
+
+            byte[] recv = new byte[256];
+
+            DatagramPacket response =
+                    new DatagramPacket(recv, recv.length);
+
+            ds.receive(response);
+
+            String msg = new String(response.getData(), 0, response.getLength());
+
+            if ("SERVER_HERE".equals(msg)) {
+                return response.getAddress().getHostAddress();
+            }
+
+        } catch (Exception e) {
+            Log.d("CHAT", "discover falhou: " + e.getMessage());
+        } finally {
+            if (ds != null) ds.close();
+        }
+
+        return null;
+    }
+
+    // =========================
+    // SERVER
+    // =========================
+    public synchronized boolean startServer(int port) {
+
+        try {
+            close();
+
+            serverSocket = new ServerSocket(port);
+
+            Log.d("CHAT", "Esperando cliente...");
+
+            socket = serverSocket.accept();
+
+            setupConnection();
+
+            return true;
+
+        } catch (Exception e) {
+            Log.d("CHAT", "server erro: " + e.getMessage());
+            connected = false;
+            return false;
+        }
+    }
+
+    // =========================
+    // CLIENT
+    // =========================
+    public synchronized boolean connectToServer(String ip, int port) {
+
+        try {
+            close();
+
+            socket = new Socket();
+            socket.connect(new InetSocketAddress(ip, port), 4000);
+
+            setupConnection();
+
+            return true;
+
+        } catch (Exception e) {
+            Log.d("CHAT", "client erro: " + e.getMessage());
+            connected = false;
+            return false;
+        }
+    }
+
+    // =========================
+    // SETUP
+    // =========================
+    private void setupConnection() throws Exception {
+
+        out = new PrintWriter(socket.getOutputStream(), true);
+        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+        connected = true;
+
+        if (connectionListener != null) {
+            connectionListener.onConnected();
+        }
+
+        startListening();
+    }
+
+    // =========================
+    // LISTEN
+    // =========================
+    private void startListening() {
+
+        listenThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+
+                    String line;
+
+                    while (connected &&
+                            socket != null &&
+                            !socket.isClosed() &&
+                            (line = in.readLine()) != null) {
+
+                        if ("__PING__".equals(line)) continue;
+
+                        if (listener != null) {
+                            listener.onMessage(line);
+                        }
+                    }
+
+                } catch (Exception e) {
+                    Log.d("CHAT", "listen erro: " + e.getMessage());
+                } finally {
+                    forceDisconnect();
+                }
+            }
+        });
+
+        listenThread.start();
+    }
+
+    // =========================
+    // SEND
+    // =========================
+    public synchronized void sendMessage(String msg) {
+
+        try {
+            if (out != null && connected) {
+                out.println(msg);
+            }
+        } catch (Exception e) {
+            forceDisconnect();
+        }
+    }
+
+    // =========================
+    // CLOSE FORÇADO
+    // =========================
+    private void forceDisconnect() {
+
+        connected = false;
+
+        if (disconnectListener != null) {
+            disconnectListener.onDisconnected();
+        }
+
+        close();
+    }
+
+    // =========================
+    // CLOSE
+    // =========================
+    public synchronized void close() {
+
+        connected = false;
+
+        try {
+            if (discoverySocket != null) discoverySocket.close();
+            if (in != null) in.close();
+            if (out != null) out.close();
+            if (socket != null) socket.close();
+            if (serverSocket != null) serverSocket.close();
+        } catch (Exception ignored) {}
+
+        discoverySocket = null;
+        in = null;
+        out = null;
+        socket = null;
+        serverSocket = null;
+    }
+
+    public boolean isConnected() {
+        return connected && socket != null && socket.isConnected();
+    }
+}

@@ -1,0 +1,67 @@
+package com.joelmir.chatwifi;
+
+import android.app.Activity;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.*;
+
+public class ConfigActivity extends Activity {
+
+    EditText editNome;   // 🔥 TEM QUE EXISTIR
+    Button btnSalvar;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        setContentView(R.layout.config);
+
+        editNome = (EditText) findViewById(R.id.editNome);
+        btnSalvar = (Button) findViewById(R.id.btnSalvar);
+
+        final android.content.SharedPreferences prefs =
+                getSharedPreferences("chat", MODE_PRIVATE);
+
+        editNome.setText(prefs.getString("nome", ""));
+
+        btnSalvar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                String nome = editNome.getText().toString();
+
+                if (nome == null || nome.trim().length() == 0) {
+                    Toast.makeText(ConfigActivity.this, "Digite um nome!", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                prefs.edit().putString("nome", nome).commit();
+
+                Toast.makeText(ConfigActivity.this, "Salvo!", Toast.LENGTH_SHORT).show();
+
+                finish();
+            }
+        });
+   
+        RadioGroup radioModo = (RadioGroup) findViewById(R.id.radioModo);
+
+        btnSalvar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                SharedPreferences prefs = getSharedPreferences("chat", MODE_PRIVATE);
+
+                String modo = radioModo.getCheckedRadioButtonId() == R.id.radioServer
+                        ? "server"
+                        : "client";
+
+                prefs.edit()
+                        .putString("nome", editNome.getText().toString())
+                        .putString("modo", modo)
+                        .commit();
+
+                finish();
+            }
+        });
+    }
+}

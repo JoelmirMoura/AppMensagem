@@ -1,0 +1,13 @@
+package com.joelmir.chatwifi;
+
+public class MessageModel {
+    public String text;
+    public String sender;
+    public boolean isMe;
+
+    public MessageModel(String text, String sender, boolean isMe) {
+        this.text = text;
+        this.sender = sender;
+        this.isMe = isMe;
+    }
+}

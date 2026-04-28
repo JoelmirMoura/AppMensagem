@@ -1,0 +1,283 @@
+package com.joelmir.chatwifi;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.*;
+
+public class ChatConnection {
+
+    private ServerSocket serverSocket;
+    private Socket socket;
+    private PrintWriter out;
+    private BufferedReader in;
+
+    private ConnectionListener connectionListener;
+    private MessageListener listener;
+
+    private volatile boolean connected = false;
+
+    private DatagramSocket discoverySocket;
+    private Thread listenThread;
+
+    // =========================
+    // INTERFACES
+    // =========================
+    public interface ConnectionListener {
+        void onConnected();
+    }
+
+    public interface MessageListener {
+        void onMessage(String msg);
+    }
+
+    // =========================
+    // SETTERS
+    // =========================
+    public void setMessageListener(MessageListener listener) {
+        this.listener = listener;
+    }
+
+    public void setConnectionListener(ConnectionListener listener) {
+        this.connectionListener = listener;
+    }
+
+    // =========================
+    // 🔥 DISCOVERY SERVER (CONTROLADO)
+    // =========================
+    public void startDiscoveryServer() {
+
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+
+                    discoverySocket = new DatagramSocket(8888);
+                    byte[] buffer = new byte[256];
+
+                    while (!discoverySocket.isClosed()) {
+
+                        DatagramPacket packet =
+                                new DatagramPacket(buffer, buffer.length);
+
+                        discoverySocket.receive(packet);
+
+                        String msg = new String(
+                                packet.getData(),
+                                0,
+                                packet.getLength()
+                        );
+
+                        if ("DISCOVER_SERVER".equals(msg)) {
+
+                            String response = "SERVER_HERE";
+
+                            DatagramPacket responsePacket =
+                                    new DatagramPacket(
+                                            response.getBytes(),
+                                            response.length(),
+                                            packet.getAddress(),
+                                            packet.getPort()
+                                    );
+
+                            discoverySocket.send(responsePacket);
+                        }
+                    }
+
+                } catch (Exception ignored) {
+                    // socket fechado ou interrompido
+                }
+            }
+        }).start();
+    }
+
+    // =========================
+    // 🔥 DISCOVERY CLIENT
+    // =========================
+    public String discoverServer() {
+
+        DatagramSocket ds = null;
+
+        try {
+            ds = new DatagramSocket();
+            ds.setBroadcast(true);
+
+            byte[] sendData = "DISCOVER_SERVER".getBytes();
+
+            DatagramPacket sendPacket =
+                    new DatagramPacket(
+                            sendData,
+                            sendData.length,
+                            InetAddress.getByName("192.168.18.255"),
+                            8888
+                    );
+
+            ds.send(sendPacket);
+
+            byte[] recv = new byte[256];
+
+            DatagramPacket receivePacket =
+                    new DatagramPacket(recv, recv.length);
+
+            ds.setSoTimeout(3000);
+            ds.receive(receivePacket);
+
+            String msg = new String(
+                    receivePacket.getData(),
+                    0,
+                    receivePacket.getLength()
+            );
+
+            if ("SERVER_HERE".equals(msg)) {
+                return receivePacket.getAddress().getHostAddress();
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (ds != null) ds.close();
+        }
+
+        return null;
+    }
+
+    // =========================
+    // SERVER
+    // =========================
+    public synchronized void startServer(int port) {
+
+        try {
+            if (connected) return;
+
+            close();
+
+            serverSocket = new ServerSocket(port);
+            socket = serverSocket.accept();
+
+            setupConnection();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            connected = false;
+        }
+    }
+
+    // =========================
+    // CLIENT
+    // =========================
+    public synchronized void connectToServer(String ip, int port) {
+
+        try {
+            if (connected) return;
+
+            close();
+
+            socket = new Socket();
+            socket.connect(new InetSocketAddress(ip, port), 5000);
+
+            setupConnection();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            connected = false;
+        }
+    }
+
+    // =========================
+    // SETUP
+    // =========================
+    private void setupConnection() throws Exception {
+
+        out = new PrintWriter(socket.getOutputStream(), true);
+        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+        connected = true;
+
+        if (connectionListener != null) {
+            connectionListener.onConnected();
+        }
+
+        startListening();
+    }
+
+    // =========================
+    // LISTENER THREAD (ROBUSTO)
+    // =========================
+    private void startListening() {
+
+        listenThread = new Thread(new Runnable() {
+            public void run() {
+
+                try {
+
+                    String line;
+
+                    while (connected && socket != null && !socket.isClosed()
+                            && (line = in.readLine()) != null) {
+
+                        if (listener != null) {
+                            listener.onMessage(line);
+                        }
+                    }
+
+                } catch (Exception e) {
+                    // conexão caiu
+                } finally {
+                    connected = false;
+                    close();
+                }
+            }
+        });
+
+        listenThread.start();
+    }
+
+    // =========================
+    // SEND
+    // =========================
+    public synchronized void sendMessage(String msg) {
+
+        try {
+            if (out != null && connected) {
+                out.println(msg);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // =========================
+    // CLOSE
+    // =========================
+    public synchronized void close() {
+
+        connected = false;
+
+        try {
+
+            if (discoverySocket != null && !discoverySocket.isClosed()) {
+                discoverySocket.close();
+            }
+
+            if (in != null) in.close();
+            if (out != null) out.close();
+            if (socket != null) socket.close();
+            if (serverSocket != null) serverSocket.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        discoverySocket = null;
+        in = null;
+        out = null;
+        socket = null;
+        serverSocket = null;
+    }
+
+    // =========================
+    // STATUS
+    // =========================
+    public boolean isConnected() {
+        return connected;
+    }
+}

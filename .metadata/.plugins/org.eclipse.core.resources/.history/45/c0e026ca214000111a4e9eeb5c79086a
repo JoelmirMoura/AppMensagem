@@ -1,0 +1,301 @@
+package com.joelmir.chatwifi;
+
+import android.app.Activity;
+import android.content.pm.ActivityInfo;
+import android.os.Bundle;
+import android.os.Handler;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.*;
+
+public class MainActivity extends Activity {
+
+    Button btnServidor;
+    Button btnEnviar;
+
+    EditText editMensagem;
+    ScrollView scrollChat;
+    LinearLayout chatContainer;
+    TextView txtStatus;
+
+    static ChatConnection chat;
+
+    private Handler handler = new Handler();
+    private boolean isServer = false;
+
+    private final int RETRY_DELAY = 5000;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
+        setContentView(R.layout.main);
+
+        btnServidor = (Button) findViewById(R.id.btnServidor);
+        btnEnviar = (Button) findViewById(R.id.btnEnviar);
+
+        editMensagem = (EditText) findViewById(R.id.editMensagem);
+
+        scrollChat = (ScrollView) findViewById(R.id.scrollChat);
+
+        chatContainer = (LinearLayout) findViewById(R.id.chatContainer);
+
+        txtStatus = (TextView) findViewById(R.id.txtStatus);
+
+        if (chat == null) {
+            chat = new ChatConnection();
+        }
+
+        // ======================
+        // CONEXÃO
+        // ======================
+        chat.setConnectionListener(new ChatConnection.ConnectionListener() {
+            @Override
+            public void onConnected() {
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        updateUIConnected(true); // 🔥 ESSENCIAL
+
+                        addSystemMessage("Conectado com sucesso!");
+                    }
+                });
+            }
+        });
+
+        // 🔥 DESCONECTAR (IMPORTANTE)
+        chat.setDisconnectListener(new ChatConnection.DisconnectListener() {
+            @Override
+            public void onDisconnected() {
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        updateUIConnected(false); // 🔥 VOLTA BOTÃO
+
+                        addSystemMessage("Desconectado");
+                    }
+                });
+            }
+        });
+
+        chat.setMessageListener(new ChatConnection.MessageListener() {
+            @Override
+            public void onMessage(final String msg) {
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        addMessage(msg, "Outro", false);
+                    }
+                });
+            }
+        });
+        // ======================
+        // SERVIDOR
+        // ======================
+        btnServidor.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                isServer = true;
+
+                updateUIConnected(true); // 🔥 AQUI (ESCONDE BOTÃO NA HORA)
+
+                handler.removeCallbacks(clientLoop);
+
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            chat.startDiscoveryServer();
+                            chat.startServer(5000);
+                        } catch (Exception e) {
+                            showError(e.getMessage());
+                        }
+                    }
+                }).start();
+            }
+        });
+
+        // ======================
+        // LOOP CLIENTE
+        // ======================
+        startClientLoop();
+
+        // ======================
+        // ENVIAR
+        // ======================
+        btnEnviar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                String msg = editMensagem.getText().toString();
+
+                if (msg == null || msg.trim().length() == 0){
+                    Toast.makeText(MainActivity.this, "Digite uma mensagem!", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                chat.sendMessage(msg);
+                addMessage(msg, "Eu", true);
+                editMensagem.setText("");
+            }
+        });
+    }
+
+    // ======================
+    // SERVER MODE UI
+    // ======================
+        private void setServerMode(final boolean serverMode) {
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+
+                    if (serverMode) {
+                        btnServidor.setVisibility(View.GONE);
+                        txtStatus.setText("🟢 Rodando como servidor");
+                    } else {
+                        btnServidor.setVisibility(View.VISIBLE);
+                        txtStatus.setText("🔍 Procurando servidor...");
+                    }
+                }
+            });
+        }
+
+    // ======================
+    // LOOP CLIENTE
+    // ======================
+        private Runnable clientLoop = new Runnable() {
+            @Override
+            public void run() {
+
+                if (isServer) return;
+
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        final String ip = chat.discoverServer();
+
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+
+                                if (ip != null) {
+                                    txtStatus.setText("📡 Servidor: " + ip);
+                                    chat.connectToServer(ip, 5000);
+                                } else {
+                                    txtStatus.setText("❌ Nenhum servidor encontrado");
+                                }
+                            }
+                        });
+                    }
+                }).start();
+
+                handler.postDelayed(this, RETRY_DELAY);
+            }
+        };
+
+    private void startClientLoop() {
+        isServer = false;
+        handler.post(clientLoop);
+    }
+
+    // ======================
+    // CHAT UI
+    // ======================
+    private void addMessage(final String msg, final String sender, final boolean isMe) {
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+
+                TextView bubble = new TextView(MainActivity.this);
+
+                bubble.setText(sender + ": " + msg);
+
+                // 🔥 TEXTO
+                bubble.setTextColor(0xFF000000);
+                bubble.setTextSize(16);
+
+                // 🔥 ESPAÇAMENTO INTERNO (ESSENCIAL PARA “CARD”)
+                int padding = 25;
+                bubble.setPadding(padding, 15, padding, 15);
+
+                // 🔥 FUNDO (CARD)
+                bubble.setBackgroundResource(
+                        isMe ? R.drawable.bubble_me : R.drawable.bubble_other
+                );
+
+                // 🔥 LAYOUT
+                LinearLayout.LayoutParams p =
+                        new LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.WRAP_CONTENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT
+                        );
+
+                p.setMargins(12, 10, 12, 10);
+
+                if (isMe) {
+                    p.gravity = Gravity.RIGHT;
+                } else {
+                    p.gravity = Gravity.LEFT;
+                }
+
+                bubble.setLayoutParams(p);
+
+                chatContainer.addView(bubble);
+
+                scrollChat.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        scrollChat.fullScroll(View.FOCUS_DOWN);
+                    }
+                });
+            }
+        });
+    }
+
+    private void addSystemMessage(final String msg) {
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+
+                TextView t = new TextView(MainActivity.this);
+                t.setText("🔔 " + msg);
+                t.setGravity(Gravity.CENTER);
+
+                chatContainer.addView(t);
+            }
+        });
+    }
+
+    private void showError(final String msg) {
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                addSystemMessage("Erro: " + msg);
+                Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+    
+    private void updateUIConnected(boolean connected) {
+
+        if (connected) {
+            btnServidor.setVisibility(View.GONE);
+            txtStatus.setText("🟢 Online");
+        } else {
+            btnServidor.setVisibility(View.VISIBLE);
+            txtStatus.setText("🔴 Offline");
+        }
+    }
+}

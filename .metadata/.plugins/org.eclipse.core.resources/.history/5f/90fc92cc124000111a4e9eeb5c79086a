@@ -1,0 +1,5 @@
+package com.joelmir.chatwifi;
+
+public class MessageModel {
+
+}

@@ -1,0 +1,357 @@
+package com.joelmir.chatwifi;
+
+import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.*;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.*;
+
+public class MainActivity extends Activity {
+
+    EditText editMensagem;
+    LinearLayout chatContainer;
+    ScrollView scrollChat;
+    Button btnEnviar;
+    Button btnConfig;
+    TextView txtStatus;
+
+    private boolean chatAttached = false;
+    private String lastStatus = "";
+    private boolean receiverRegistered = false;
+    private boolean appInBackground = false;
+
+    private boolean reconnecting = false;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
+
+        editMensagem = (EditText) findViewById(R.id.editMensagem);
+        chatContainer = (LinearLayout) findViewById(R.id.chatContainer);
+        scrollChat = (ScrollView) findViewById(R.id.scrollChat);
+        btnEnviar = (Button) findViewById(R.id.btnEnviar);
+        btnConfig = (Button) findViewById(R.id.btnConfig);
+        txtStatus = (TextView) findViewById(R.id.txtStatus);
+
+        registerReceiverSafe();
+
+        btnConfig.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this, ConfigActivity.class));
+            }
+        });
+
+        btnEnviar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+            	if (ChatHolder.chat == null) {
+                    Toast.makeText(MainActivity.this, "Não conectado", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                String msg = editMensagem.getText().toString().trim();
+                if (msg.length() == 0) return;
+
+                ChatHolder.chat.sendMessage(msg);
+                ChatHolder.addMessage("Eu: " + msg);
+
+                addMessage("Eu: " + msg, true);
+
+                editMensagem.setText("");
+            }
+        });
+
+        txtStatus.setText("Aguardando serviço...");
+        rebuildChat();
+    }
+
+    // =========================
+    private void rebuildChat() {
+
+        if (chatContainer == null) return;
+
+        chatContainer.removeAllViews();
+
+        if (ChatHolder.messages == null) return;
+
+        for (int i = 0; i < ChatHolder.messages.size(); i++) {
+
+            String msg = ChatHolder.messages.get(i);
+            boolean isMe = msg.startsWith("Eu:");
+
+            addMessage(msg, isMe);
+        }
+    }
+
+    // =========================
+    private void registerReceiverSafe() {
+
+        if (receiverRegistered) return;
+
+        registerReceiver(receiver,
+                new IntentFilter(ChatHolder.ACTION_STATUS));
+
+        receiverRegistered = true;
+    }
+
+    // =========================
+    private BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+
+            String status = intent.getStringExtra("status");
+            String error = intent.getStringExtra("error");
+
+            if (status == null) return;
+            if (status.equals(lastStatus)) return;
+
+            lastStatus = status;
+
+            if ("server_running".equals(status)) {
+
+                String ip = getSharedPreferences("chat", MODE_PRIVATE)
+                        .getString("ip", "");
+
+                txtStatus.setText("Servidor ativo\nIP: " +
+                        (ip == null || ip.length() == 0 ? "obtendo..." : ip));
+
+                chatAttached = false;
+                setupChat();
+                return;
+            }
+
+            if ("service_down".equals(status)) {
+
+                txtStatus.setText("Servidor caiu");
+
+                attemptReconnect();
+                return;
+            }
+
+            if ("connected".equals(status)) {
+                txtStatus.setText("Conectado");
+                chatAttached = false;
+                setupChat();
+                return;
+            }
+
+            if ("connecting".equals(status)) {
+                txtStatus.setText("Conectando...\n" + error);
+                return;
+            }
+
+            if ("disconnected".equals(status)) {
+                txtStatus.setText("Conexão perdida");
+                return;
+            }
+
+            txtStatus.setText(status);
+        }
+    };
+
+    // =========================
+    private void attemptReconnect() {
+
+        if (reconnecting) return;
+        reconnecting = true;
+
+        SharedPreferences prefs = getSharedPreferences("chat", MODE_PRIVATE);
+        final String ip = prefs.getString("ip", "");
+
+        if (ip == null || ip.trim().length() == 0) {
+            txtStatus.setText("Sem IP para reconectar");
+            reconnecting = false;
+            return;
+        }
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                int attempts = 0;
+
+                while (attempts < 10) {
+
+                    try {
+                        attempts++;
+
+                        Thread.sleep(2000);
+
+                        boolean ok = ChatHolder.chat.connectToServer(ip, 9999);
+
+                        if (ok && ChatHolder.chat.isConnected()) {
+
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    txtStatus.setText("Reconectado");
+                                    chatAttached = false;
+                                    reconnecting = false;
+                                    setupChat();
+                                }
+                            });
+
+                            return;
+                        }
+
+                    } catch (Exception e) {
+                        Log.e("RECONNECT", "erro", e);
+                    }
+                }
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        txtStatus.setText("Falha ao reconectar");
+                        reconnecting = false;
+                    }
+                });
+            }
+        }).start();
+    }
+
+    // =========================
+    @Override
+    protected void onPause() {
+        super.onPause();
+        appInBackground = true;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        appInBackground = false;
+
+        SharedPreferences prefs = getSharedPreferences("chat", MODE_PRIVATE);
+
+        String modo = prefs.getString("modo", "client");
+        String ip = prefs.getString("ip", "");
+
+        Intent i = new Intent(this, ChatService.class);
+        stopService(i);
+        startService(i);
+
+        txtStatus.setText(
+                "server".equals(modo)
+                        ? "Servidor iniciando...\nIP: " + ip
+                        : "Conectando a " + ip
+        );
+
+        rebuildChat(); // 🔥 garante sync ao voltar
+    }
+
+    // =========================
+    private void setupChat() {
+
+        if (ChatHolder.chat == null || chatAttached) return;
+
+        chatAttached = true;
+
+        ChatHolder.chat.setMessageListener(new ChatConnection.MessageListener() {
+            @Override
+            public void onMessage(final String msg) {
+
+                ChatHolder.addMessage(msg);
+
+                if (appInBackground) {
+                    showNotification(msg);
+                }
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        addMessage(msg, false);
+                    }
+                });
+            }
+        });
+    }
+
+    // =========================
+    private void addMessage(String msg, boolean me) {
+
+        TextView tv = new TextView(this);
+        tv.setText(msg);
+        tv.setTextColor(0xFF000000);
+        tv.setTextSize(16);
+
+        LinearLayout.LayoutParams p =
+                new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+
+        p.gravity = me ? Gravity.RIGHT : Gravity.LEFT;
+        p.setMargins(10, 6, 10, 6);
+
+        tv.setLayoutParams(p);
+
+        tv.setBackgroundResource(
+                me ? R.drawable.bubble_me : R.drawable.bubble_other
+        );
+
+        chatContainer.addView(tv);
+
+        scrollChat.post(new Runnable() {
+            @Override
+            public void run() {
+                scrollChat.fullScroll(View.FOCUS_DOWN);
+            }
+        });
+    }
+
+    // =========================
+    private void showNotification(String msg) {
+
+        NotificationManager manager =
+                (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+
+        Intent intent = new Intent(this, MainActivity.class);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT
+        );
+
+        Notification notification = new Notification(
+                android.R.drawable.sym_action_chat,
+                "Nova mensagem",
+                System.currentTimeMillis()
+        );
+
+        notification.setLatestEventInfo(
+                this,
+                "Chat WiFi",
+                msg,
+                pendingIntent
+        );
+
+        notification.flags |= Notification.FLAG_AUTO_CANCEL;
+
+        manager.notify(1001, notification);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        try {
+            if (receiverRegistered) {
+                unregisterReceiver(receiver);
+                receiverRegistered = false;
+            }
+        } catch (Exception ignored) {}
+
+        chatAttached = false;
+    }
+}
